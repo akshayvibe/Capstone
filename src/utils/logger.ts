@@ -24,6 +24,10 @@ export const logger: winston.Logger = winston.createLogger({
   defaultMeta: { service: 'helix' },
   transports: [
     new winston.transports.Console({
+      // Logs go to stderr so stdout carries only the rendered CLI
+      // response — keeps `--json` output machine-readable even when
+      // fallback warnings fire on the dispatch path.
+      stderrLevels: ['error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly'],
       format:
         process.env['LOG_FORMAT'] === 'json'
           ? winston.format.combine(winston.format.timestamp(), winston.format.json())

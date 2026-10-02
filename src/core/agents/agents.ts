@@ -38,10 +38,11 @@ export class CodeAgent extends BaseAgent {
   public readonly intent: AgentIntent = 'analyze';
 
   protected async run(payload: AgentPayload): Promise<Omit<AgentResult, 'agent' | 'intent' | 'durationMs'>> {
+    const chunks = payload.context?.retrievedChunks.length ?? 0;
     return {
       success: true,
-      summary: `[CodeAgent:mock] analyzed prompt "${payload.prompt}" (dryRun=${payload.options.dryRun})`,
-      data: { filesScanned: 0, findings: [] },
+      summary: `[CodeAgent:mock] analyzed prompt "${payload.prompt}" (dryRun=${payload.options.dryRun}, contextChunks=${chunks})`,
+      data: { filesScanned: 0, findings: [], contextChunks: chunks },
     };
   }
 }
@@ -52,10 +53,11 @@ export class SecurityAgent extends BaseAgent {
   public readonly intent: AgentIntent = 'secure';
 
   protected async run(payload: AgentPayload): Promise<Omit<AgentResult, 'agent' | 'intent' | 'durationMs'>> {
+    const chunks = payload.context?.retrievedChunks.length ?? 0;
     return {
       success: true,
-      summary: `[SecurityAgent:mock] security scan for "${payload.prompt}" (dryRun=${payload.options.dryRun})`,
-      data: { vulnerabilities: [] },
+      summary: `[SecurityAgent:mock] security scan for "${payload.prompt}" (dryRun=${payload.options.dryRun}, contextChunks=${chunks})`,
+      data: { vulnerabilities: [], contextChunks: chunks },
     };
   }
 }
@@ -66,10 +68,11 @@ export class EnvironmentAgent extends BaseAgent {
   public readonly intent: AgentIntent = 'monitor';
 
   protected async run(payload: AgentPayload): Promise<Omit<AgentResult, 'agent' | 'intent' | 'durationMs'>> {
+    const chunks = payload.context?.retrievedChunks.length ?? 0;
     return {
       success: true,
-      summary: `[EnvironmentAgent:mock] environment check for "${payload.prompt}" (dryRun=${payload.options.dryRun})`,
-      data: { healthy: true },
+      summary: `[EnvironmentAgent:mock] environment check for "${payload.prompt}" (dryRun=${payload.options.dryRun}, contextChunks=${chunks})`,
+      data: { healthy: true, contextChunks: chunks },
     };
   }
 }

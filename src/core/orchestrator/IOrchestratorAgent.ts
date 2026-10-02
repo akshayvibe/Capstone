@@ -6,9 +6,9 @@ import type { AgentPayload, CliResponse, RoutingDecision } from '../../types/ind
  * Dependency Inversion: the CLI routing layer depends on this
  * abstraction, never on a concrete orchestrator implementation.
  *
- * Future integration point: `route()` will call into `laya-mlx`
- * for fast, typed decision routing. Today it uses a deterministic
- * keyword heuristic behind the same typed boundary.
+ * `route()` resolves via the Laya-MLX sidecar (`LayaRouter`) with a
+ * deterministic keyword-heuristic fallback; `dispatch()` additionally
+ * fans out RAG context from `ProjectIndexer` to every sub-agent.
  */
 export interface IOrchestratorAgent {
   /** Decide which sub-agents should handle the payload. */

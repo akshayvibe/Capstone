@@ -40,6 +40,20 @@ export class AgentExecutionError extends HelixError {
   }
 }
 
+/** The Laya-MLX sidecar could not produce a routing decision. */
+export class LayaUnavailableError extends HelixError {
+  public constructor(message: string, context?: Record<string, unknown>, cause?: unknown) {
+    super(message, { code: 'LAYA_UNAVAILABLE', exitCode: 3, context, cause });
+  }
+}
+
+/** The ChromaDB vector store is unreachable or returned an invalid result. */
+export class VectorStoreError extends HelixError {
+  public constructor(message: string, context?: Record<string, unknown>, cause?: unknown) {
+    super(message, { code: 'VECTOR_STORE_ERROR', exitCode: 3, context, cause });
+  }
+}
+
 /** Type guard for HelixError. */
 export function isHelixError(err: unknown): err is HelixError {
   return err instanceof HelixError;

@@ -14,12 +14,21 @@
     "typecheck": "tsc --noEmit",
     "helix": "node dist/index.js"
   },
-  "keywords": ["cli", "ai", "multi-agent", "orchestrator", "commander"],
+  "keywords": [
+    "cli",
+    "ai",
+    "multi-agent",
+    "orchestrator",
+    "commander"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "chromadb": "^3.5.0",
     "commander": "^12.1.0",
-    "winston": "^3.13.0"
+    "laya-http-client": "^0.2.0",
+    "winston": "^3.13.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^20.12.0",
