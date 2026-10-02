@@ -1,45 +1,19 @@
 import { Command } from 'commander';
 import { randomUUID } from 'node:crypto';
 import type winston from 'winston';
+import type { ProjectIndexer } from '../core/rag/ProjectIndexer.js';
 import type { IOrchestratorAgent } from '../core/orchestrator/IOrchestratorAgent.js';
-import type { AgentIntent, AgentPayload, CliOptions, CliResponse, RawCliOptions } from '../types/index.js';
+import type { AgentIntent, AgentPayload, RawCliOptions } from '../types/index.js';
 import { CliValidationError } from '../utils/errors.js';
+import { runChatLoop } from './chat.js';
+import { DEFAULT_TIMEOUT_MS, intentsFromOptions, normalizeOptions } from './options.js';
+import { renderResponse } from './render.js';
 
 export interface CliContext {
   orchestrator: IOrchestratorAgent;
   logger: winston.Logger;
-}
-
-const DEFAULT_TIMEOUT_MS = 30_000;
-
-/** Normalize raw commander options into a validated CliOptions object. */
-export function normalizeOptions(raw: RawCliOptions): CliOptions {
-  let timeoutMs = DEFAULT_TIMEOUT_MS;
-  if (raw.timeout !== undefined) {
-    const parsed = Number(raw.timeout);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      throw new CliValidationError(`Invalid --timeout value: "${raw.timeout}". Expected a positive number of ms.`);
-    }
-    timeoutMs = Math.floor(parsed);
-  }
-  return {
-    analyze: raw.analyze === true,
-    secure: raw.secure === true,
-    monitor: raw.monitor === true,
-    verbose: raw.verbose === true,
-    json: raw.json === true,
-    dryRun: raw.dryRun === true,
-    timeoutMs,
-  };
-}
-
-/** Derive explicit intents from flags; empty => let orchestrator infer. */
-export function intentsFromOptions(opts: CliOptions): AgentIntent[] {
-  const intents: AgentIntent[] = [];
-  if (opts.analyze) intents.push('analyze');
-  if (opts.secure) intents.push('secure');
-  if (opts.monitor) intents.push('monitor');
-  return intents;
+  /** RAG indexer for the chat `/index` command; chat works without it. */
+  indexer?: ProjectIndexer | undefined;
 }
 
 /**
@@ -74,25 +48,6 @@ function sharedOptions(cmd: Command): Command {
     .option('--json', 'emit machine-readable JSON response', false)
     .option('--timeout <ms>', 'per-agent timeout in milliseconds', String(DEFAULT_TIMEOUT_MS))
     .option('-v, --verbose', 'verbose (debug) logging', false);
-}
-
-function renderResponse(response: CliResponse, opts: CliOptions): void {
-  if (opts.json) {
-    console.log(JSON.stringify(response, null, 2));
-    return;
-  }
-  console.log(`\nHELIX trace ${response.traceId} (${response.durationMs}ms)`);
-  console.log(`prompt : ${response.prompt}`);
-  console.log(`intents: ${response.intents.join(', ') || '(none)'}${response.dryRun ? ' [dry-run]' : ''}\n`);
-  if (response.results.length === 0) {
-    console.log('(no agents executed — see routing above)\n');
-    return;
-  }
-  for (const r of response.results) {
-    const icon = r.success ? '✔' : '✘';
-    console.log(`${icon} [${r.agent}/${r.intent}] ${r.summary} (${r.durationMs}ms)`);
-  }
-  console.log('');
 }
 
 async function handlePrompt(prompt: string | undefined, raw: RawCliOptions, ctx: CliContext): Promise<void> {
@@ -148,7 +103,8 @@ export function buildProgram(ctx: CliContext): Command {
         '  helix "audit auth for injection flaws" --secure --json\n' +
         '  helix secure "scan api for XSS"\n' +
         '  helix run agents --analyze   # "agents" treated as prompt, not subcommand\n' +
-        '  helix -- agents               # "--" also disambiguates prompt text\n',
+        '  helix -- agents               # "--" also disambiguates prompt text\n' +
+        '  helix chat                    # interactive REPL (slash commands: /help)\n',
     );
 
   const rootAction = async (promptParts: string[], _opts: unknown, cmd: Command): Promise<void> => {
@@ -195,6 +151,24 @@ export function buildProgram(ctx: CliContext): Command {
     .action(() => {
       for (const line of ctx.orchestrator.listAgents()) console.log(`- ${line}`);
     });
+
+  // Interactive REPL: `helix chat` (optional first task, then loop).
+  // `helix run chat ...` still treats "chat" as prompt text.
+  const chat = program
+    .command('chat')
+    .description('interactive mode: send tasks in a loop (/help, /agents, /index, /json, /exit)');
+  chat.argument('[prompt...]', 'optional first task to run before entering the loop');
+  chat.option('--json', 'emit machine-readable JSON responses', false);
+  chat.option('--timeout <ms>', 'per-agent timeout in milliseconds', String(DEFAULT_TIMEOUT_MS));
+  chat.action(async (promptParts: string[], _opts: unknown, cmd: Command) => {
+    const raw = mergeRawOptions(program.opts<RawCliOptions>(), cmd.opts<RawCliOptions>());
+    const options = normalizeOptions(raw);
+    await runChatLoop(ctx, {
+      initialPrompt: (promptParts ?? []).join(' '),
+      json: options.json,
+      timeoutMs: options.timeoutMs,
+    });
+  });
 
   return program;
 }

@@ -22,5 +22,11 @@
     "useUnknownInCatchVariables": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist"],
+  "ts-node": {
+    // Source uses `.js`-suffixed imports (resolves to real `.js` in `dist/`
+    // after `tsc`). The resolver maps those specifiers back to `.ts` so
+    // `npm run dev` (ts-node on raw `src/`) resolves the same way.
+    "experimentalResolver": true
+  }
 }

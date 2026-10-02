@@ -41,7 +41,7 @@ async function main(): Promise<void> {
     minConfidence: config.layaMinConfidence,
     ragTopK: config.ragTopK,
   });
-  const program = buildProgram({ orchestrator, logger });
+  const program = buildProgram({ orchestrator, logger, indexer });
 
   try {
     await program.parseAsync(process.argv);

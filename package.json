@@ -10,7 +10,7 @@
     "build": "tsc",
     "postbuild": "chmod +x dist/index.js",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts",
+    "dev": "NODE_OPTIONS=--no-deprecation ts-node src/index.ts",
     "typecheck": "tsc --noEmit",
     "helix": "node dist/index.js"
   },
