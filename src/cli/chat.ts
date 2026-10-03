@@ -33,7 +33,7 @@ interface ChatState {
   timeoutMs: number;
 }
 
-type ChatAction =
+export type ChatAction =
   | { kind: 'empty' }
   | { kind: 'task'; prompt: string; intents: AgentIntent[] }
   | { kind: 'command'; name: string; arg: string };
@@ -47,8 +47,8 @@ const INTENT_FLAGS: Record<string, AgentIntent> = {
   '-m': 'monitor',
 };
 
-/** Split one input line into an empty/task/command action. */
-function parseLine(line: string): ChatAction {
+/** Split one input line into an empty/task/command action. Shared with the TUI. */
+export function parseLine(line: string): ChatAction {
   const trimmed = line.trim();
   if (trimmed.length === 0) return { kind: 'empty' };
   if (trimmed.startsWith('/')) {

@@ -8,6 +8,7 @@ import { CliValidationError } from '../utils/errors.js';
 import { runChatLoop } from './chat.js';
 import { DEFAULT_TIMEOUT_MS, intentsFromOptions, normalizeOptions } from './options.js';
 import { renderResponse } from './render.js';
+import { runTui } from './tui/tui.js';
 
 export interface CliContext {
   orchestrator: IOrchestratorAgent;
@@ -104,7 +105,8 @@ export function buildProgram(ctx: CliContext): Command {
         '  helix secure "scan api for XSS"\n' +
         '  helix run agents --analyze   # "agents" treated as prompt, not subcommand\n' +
         '  helix -- agents               # "--" also disambiguates prompt text\n' +
-        '  helix chat                    # interactive REPL (slash commands: /help)\n',
+        '  helix chat                    # interactive REPL (slash commands: /help)\n' +
+        '  helix ui                      # full-screen terminal UI\n',
     );
 
   const rootAction = async (promptParts: string[], _opts: unknown, cmd: Command): Promise<void> => {
@@ -168,6 +170,15 @@ export function buildProgram(ctx: CliContext): Command {
       json: options.json,
       timeoutMs: options.timeoutMs,
     });
+  });
+
+  // Full-screen terminal UI (alternate screen buffer, raw-mode input).
+  // `helix run ui ...` still treats "ui" as prompt text.
+  const ui = program
+    .command('ui')
+    .description('full-screen terminal UI: dashboard for tasks, agents, and RAG context');
+  ui.action(async () => {
+    await runTui(ctx);
   });
 
   return program;

@@ -218,7 +218,14 @@ export class OrchestratorAgent implements IOrchestratorAgent {
     const text = prompt.toLowerCase();
     const intents = new Set<AgentIntent>();
     if (/\b(secur\w*|vuln\w*|cve|xss|sast|injection|pen-?\s?test|threat|audit)\b/.test(text)) intents.add('secure');
-    if (/\b(monitor\w*|health\w*|uptime|metrics?|logs?|deploy\w*|infra\w*|environments?)\b/.test(text))
+    // Infra keywords stay narrow on purpose: bare "service"/"image"/"memory"
+    // also appear in code tasks ("AuthService", "image gallery", "memory leak"),
+    // so only docker/k8s-ecosystem terms force monitor here.
+    if (
+      /\b(monitor\w*|health\w*|uptime|metrics?|logs?|deploy\w*|infra\w*|environments?|docker\w*|containers?|compose|kubernetes|k8s|kubectl|pods?|podman|helm)\b/.test(
+        text,
+      )
+    )
       intents.add('monitor');
     if (/\b(analy[sz]e|review\w*|refactor\w*|lint\w*|explain|code|typescript|function|bugs?)\b/.test(text))
       intents.add('analyze');

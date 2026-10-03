@@ -68,7 +68,7 @@ const ROUTING_QUESTIONS = {
     criteria: {
       analyze: 'code analysis, review, refactor, lint, explain, typescript, functions, bugs',
       secure: 'security audit, vulnerabilities, CVE, XSS, injection, SAST, pen test, threats',
-      monitor: 'environment monitoring, health, uptime, metrics, logs, deploy, infra',
+      monitor: 'environment monitoring, health, uptime, metrics, logs, deploy, infra, docker, containers',
     },
   },
   urgency: {

@@ -27,6 +27,21 @@ Inside the loop, append `--analyze` / `--secure` / `--monitor` to force
 routing for that line. Slash commands: `/agents`, `/index [path]`
 (re-index files for RAG), `/json` (toggle JSON output), `/help`,
 `/exit` (Ctrl+C / Ctrl+D also quit).
+
+### Terminal UI
+
+```bash
+node dist/index.js ui
+```
+
+Full-screen terminal dashboard (alternate screen buffer — your scrollback
+is untouched): live status header with spinner, scrollable results,
+single-line composer with history (↑/↓), cursor + word editing
+(Ctrl+A/E/W/U/K), message scrolling (PgUp/PgDn), Tab-completion for
+slash commands, and modal overlays for `/agents` and `/help`.
+Slash commands: `/agents`, `/index [path]`, `/mode <auto|analyze|secure|
+monitor>`, `/help`, `/exit`. Needs a TTY — for piped input use
+`helix chat` instead.
 Both sidecars below are **best-effort**: with nothing running, HELIX
 degrades to keyword-heuristic routing + in-memory keyword retrieval.
 
@@ -95,9 +110,10 @@ in-memory docs and degrades to keyword-overlap ranking (`fallbackMode`).
 - `src/index.ts` — thin bootstrap: config → `LayaRouter` + `ProjectIndexer`
   → `OrchestratorAgent` → commander.
 - `src/cli/program.ts` — one-shot commands (`run`, `analyze`, `secure`,
-  `monitor`, `agents`, `chat`); `src/cli/chat.ts` — interactive REPL loop;
-  `src/cli/options.ts` + `src/cli/render.ts` — shared flag normalization
-  and response rendering used by both modes.
+  `monitor`, `agents`, `chat`, `ui`); `src/cli/chat.ts` — line REPL loop;
+  `src/cli/tui/` — full-screen terminal UI (`tui.ts`, raw-mode `keys.ts`,
+  `ansi.ts`, `text.ts`); `src/cli/options.ts` + `src/cli/render.ts` —
+  shared flag normalization and response rendering.
 - `src/core/orchestrator/OrchestratorAgent.ts` — flags → Laya → heuristic
   routing; RAG-enriched parallel fan-out with per-agent timeouts.
 - `src/core/routing/LayaRouter.ts`, `layaWire.ts` — typed decision adapter.
