@@ -1,0 +1,36 @@
+{
+  "advisories": {},
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 1,
+      "moderate": 1,
+      "high": 0,
+      "critical": 0
+    }
+  },
+  "vulnerabilities": {
+    "lodash": {
+      "name": "lodash",
+      "severity": "moderate",
+      "via": [
+        { "title": "Command Injection in lodash", "url": "https://github.com/advisories/..." }
+      ],
+      "effects": [],
+      "range": "<4.17.21",
+      "nodes": ["node_modules/lodash"],
+      "fixAvailable": { "name": "lodash", "version": "4.17.21" },
+      "isDirect": true
+    },
+    "minimist": {
+      "name": "minimist",
+      "severity": "low",
+      "via": ["Prototype Pollution in minimist"],
+      "effects": [],
+      "range": "<1.2.6",
+      "nodes": ["node_modules/minimist"],
+      "fixAvailable": true,
+      "isDirect": false
+    }
+  }
+}

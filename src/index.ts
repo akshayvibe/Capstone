@@ -11,6 +11,7 @@
  * heuristic routing, and a missing ChromaDB server degrades to
  * in-memory keyword retrieval. Boot never fails for either.
  */
+import 'dotenv/config';
 import { buildProgram } from './cli/program.js';
 import { OrchestratorAgent } from './core/orchestrator/OrchestratorAgent.js';
 import { ProjectIndexer } from './core/rag/ProjectIndexer.js';
@@ -41,7 +42,7 @@ async function main(): Promise<void> {
     minConfidence: config.layaMinConfidence,
     ragTopK: config.ragTopK,
   });
-  const program = buildProgram({ orchestrator, logger, indexer });
+  const program = buildProgram({ orchestrator, logger, indexer, config });
 
   try {
     await program.parseAsync(process.argv);

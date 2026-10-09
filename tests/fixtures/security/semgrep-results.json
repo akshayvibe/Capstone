@@ -1,0 +1,30 @@
+{
+  "version": "1.0.0",
+  "errors": [],
+  "results": [
+    {
+      "check_id": "javascript.express.security.audit.express-check-csurf-middleware-usage",
+      "path": "src/server.js",
+      "start": { "line": 12, "col": 1 },
+      "end": { "line": 12, "col": 40 },
+      "extra": {
+        "message": "CSRF middleware is missing",
+        "severity": "WARNING",
+        "lines": "app.use(bodyParser.urlencoded())",
+        "metadata": { "cwe": "CWE-352", "owasp": "A01:2021" }
+      }
+    },
+    {
+      "check_id": "javascript.lang.security.audit.path-traversal.path-join-resolve-traversal",
+      "path": "src/files.js",
+      "start": { "line": 7 },
+      "end": { "line": 7 },
+      "extra": {
+        "message": "Possible path traversal",
+        "severity": "ERROR",
+        "lines": "path.join(base, req.query.file)",
+        "metadata": { "cwe": "CWE-22" }
+      }
+    }
+  ]
+}

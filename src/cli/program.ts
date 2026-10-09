@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type winston from 'winston';
 import type { ProjectIndexer } from '../core/rag/ProjectIndexer.js';
 import type { IOrchestratorAgent } from '../core/orchestrator/IOrchestratorAgent.js';
-import type { AgentIntent, AgentPayload, RawCliOptions } from '../types/index.js';
+import type { AgentIntent, AgentPayload, HelixConfig, RawCliOptions } from '../types/index.js';
 import { CliValidationError } from '../utils/errors.js';
 import { runChatLoop } from './chat.js';
 import { DEFAULT_TIMEOUT_MS, intentsFromOptions, normalizeOptions } from './options.js';
@@ -13,6 +13,7 @@ import { runTui } from './tui/tui.js';
 export interface CliContext {
   orchestrator: IOrchestratorAgent;
   logger: winston.Logger;
+  config: HelixConfig;
   /** RAG indexer for the chat `/index` command; chat works without it. */
   indexer?: ProjectIndexer | undefined;
 }

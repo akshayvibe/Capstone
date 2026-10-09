@@ -1,0 +1,14 @@
+[
+  {
+    "RuleID": "aws-access-key",
+    "File": "config/secrets.env",
+    "StartLine": 3,
+    "EndLine": 3,
+    "StartColumn": 11,
+    "EndColumn": 31,
+    "Match": "AWS_ACCESS_KEY_ID=[REDACTED]",
+    "Secret": "REDACTED",
+    "Entropy": 3.75,
+    "Commit": "abc123"
+  }
+]

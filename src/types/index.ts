@@ -189,6 +189,67 @@ export interface AgentPayload {
   context?: UnifiedAgentContext | undefined;
 }
 
+/** Severity level for every issue produced by a sub-agent. */
+export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info';
+
+/** Location of an issue inside a source file or external report. */
+export interface AgentIssueLocation {
+  filePath: string;
+  line?: number | undefined;
+  column?: number | undefined;
+  endLine?: number | undefined;
+  endColumn?: number | undefined;
+}
+
+/** One normalized finding produced by Code, Security, or Environment agents. */
+export interface AgentIssue {
+  /** Stable identifier, usually `${agent}:${ruleId}:...`. */
+  id: string;
+  /** Rule, tool check, or probe that produced the issue. */
+  ruleId: string;
+  /** Short human-readable title. */
+  title: string;
+  /** Detailed description. */
+  message: string;
+  severity: Severity;
+  /** Logical category for downstream filtering. */
+  category:
+    | 'bug'
+    | 'code-quality'
+    | 'vulnerability'
+    | 'secret'
+    | 'dependency'
+    | 'misconfiguration'
+    | 'environment';
+  location?: AgentIssueLocation | undefined;
+  /** Bounded raw evidence (code snippet, redacted match, log line). Never raw secrets. */
+  evidence: string;
+  /** Optional remediation hint. */
+  remediation?: string | undefined;
+  /** Tool-specific scalar metadata (CWE, CVE, confidence, etc.). */
+  metadata?: Record<string, string | number | boolean> | undefined;
+}
+
+/** Normalized report returned by every specialized sub-agent in `AgentResult.data`. */
+export interface AgentReport {
+  agent: string;
+  intent: AgentIntent;
+  /** ISO-8601 timestamp when the report was generated. */
+  generatedAt: string;
+  /** All findings produced by the agent. */
+  issues: AgentIssue[];
+  /** Count of issues per severity, always populated for every level. */
+  counts: Record<Severity, number>;
+  /** Number of source files scanned (when applicable). */
+  filesScanned: number;
+  /** External tools invoked and their resolved versions. */
+  toolsUsed: string[];
+  /** Tools that were required but unavailable or failed to initialize. */
+  toolsUnavailable: string[];
+  /** Optional bounded raw output (only included under `--verbose`). */
+  rawEvidence?: unknown;
+}
+
 /** Standard envelope every agent must return. */
 export interface AgentResult {
   agent: string;
@@ -227,6 +288,18 @@ export interface RoutingDecision {
 
 /** Effective runtime configuration resolved once at boot. */
 export interface HelixConfig {
+  /** Semgrep rule config passed via `--config` (e.g. `auto`, `p/typescript`, local dir). */
+  semgrepConfig: string;
+  /** Max source files the CodeAgent will scan. */
+  codeMaxFiles: number;
+  /** Timeout for external security / environment tool subprocesses. */
+  agentToolTimeoutMs: number;
+  /** OpenRouter API key for interactive chat responses. */
+  openRouterApiKey?: string | undefined;
+  /** OpenRouter-compatible model identifier. */
+  openRouterModel: string;
+  /** OpenRouter API base URL. */
+  openRouterBaseUrl: string;
   /** Laya-MLX sidecar base URL (no trailing path). */
   layaUrl: string;
   /** Per-request timeout for the Laya sidecar in ms. */

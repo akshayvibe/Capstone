@@ -54,6 +54,42 @@ export class VectorStoreError extends HelixError {
   }
 }
 
+/** An external CLI tool (semgrep, gitleaks, docker, etc.) is not installed. */
+export class ToolUnavailableError extends HelixError {
+  public readonly tool: string;
+  public constructor(tool: string, message: string, context?: Record<string, unknown>, cause?: unknown) {
+    super(`[${tool}] ${message}`, { code: 'TOOL_UNAVAILABLE', exitCode: 3, context, cause });
+    this.tool = tool;
+  }
+}
+
+/** An external CLI tool executed but returned a non-zero or otherwise unexpected status. */
+export class ToolExecutionError extends HelixError {
+  public readonly tool: string;
+  public constructor(tool: string, message: string, context?: Record<string, unknown>, cause?: unknown) {
+    super(`[${tool}] ${message}`, { code: 'TOOL_EXECUTION_ERROR', exitCode: 3, context, cause });
+    this.tool = tool;
+  }
+}
+
+/** An external CLI tool returned output that could not be parsed or schema-validated. */
+export class ToolOutputParseError extends HelixError {
+  public readonly tool: string;
+  public constructor(tool: string, message: string, context?: Record<string, unknown>, cause?: unknown) {
+    super(`[${tool}] ${message}`, { code: 'TOOL_OUTPUT_PARSE_ERROR', exitCode: 3, context, cause });
+    this.tool = tool;
+  }
+}
+
+/** A source file could not be parsed by the tree-sitter parser. */
+export class AstParseError extends HelixError {
+  public readonly filePath: string;
+  public constructor(filePath: string, message: string, context?: Record<string, unknown>, cause?: unknown) {
+    super(`[${filePath}] ${message}`, { code: 'AST_PARSE_ERROR', exitCode: 3, context, cause });
+    this.filePath = filePath;
+  }
+}
+
 /** Type guard for HelixError. */
 export function isHelixError(err: unknown): err is HelixError {
   return err instanceof HelixError;

@@ -44,6 +44,12 @@ function parseBool(raw: string | undefined, fallback: boolean): boolean {
  */
 export function loadHelixConfig(env: NodeJS.ProcessEnv = process.env): HelixConfig {
   return {
+    semgrepConfig: env['HELIX_SEMGREP_CONFIG'] ?? 'auto',
+    codeMaxFiles: parsePositiveInt(env['HELIX_CODE_MAX_FILES'], 200),
+    agentToolTimeoutMs: parsePositiveInt(env['HELIX_AGENT_TOOL_TIMEOUT_MS'], 60_000),
+    openRouterApiKey: env['OPENROUTER_API_KEY'],
+    openRouterModel: env['OPENROUTER_MODEL'] ?? 'openai/gpt-4o-mini',
+    openRouterBaseUrl: env['OPENROUTER_BASE_URL'] ?? 'https://openrouter.ai/api/v1',
     layaUrl: env['LAYA_SIDECAR_URL'] ?? env['HELIX_LAYA_URL'] ?? 'http://127.0.0.1:8000',
     layaTimeoutMs: parsePositiveInt(env['HELIX_LAYA_TIMEOUT_MS'], 3000),
     layaMinConfidence: parseConfidence(env['HELIX_MIN_CONFIDENCE'], 0.35),

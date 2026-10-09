@@ -19,10 +19,12 @@
  */
 import { randomUUID } from 'node:crypto';
 import type winston from 'winston';
-import type { AgentIntent, AgentPayload, CliOptions } from '../../types/index.js';
+import type { AgentIntent, AgentPayload, AgentReport, AgentResult, CliOptions } from '../../types/index.js';
 import { CliValidationError } from '../../utils/errors.js';
 import { DEFAULT_TIMEOUT_MS } from '../options.js';
 import { parseLine } from '../chat.js';
+import { OpenRouterClient, type ChatMessage } from '../../core/llm/OpenRouterClient.js';
+import { formatAgentReport } from '../../core/llm/formatReport.js';
 import type { CliContext } from '../program.js';
 import {
   ALT_ENTER,
@@ -61,6 +63,11 @@ export interface TuiErrorMsg {
   kind: 'error';
   text: string;
 }
+export interface TuiAssistantMsg {
+  kind: 'assistant';
+  text: string;
+  model: string;
+}
 export interface TuiResultMsg {
   kind: 'result';
   agent: string;
@@ -72,7 +79,7 @@ export interface TuiResultMsg {
   contextFiles: string[];
   contextCount: number;
 }
-export type TuiMsg = TuiUserMsg | TuiInfoMsg | TuiErrorMsg | TuiResultMsg;
+export type TuiMsg = TuiUserMsg | TuiInfoMsg | TuiErrorMsg | TuiAssistantMsg | TuiResultMsg;
 
 export interface TuiState {
   width: number;
@@ -92,10 +99,46 @@ export interface TuiState {
   mode: TuiMode;
   overlay: TuiOverlay;
   agentsCache: string[];
+  /** OpenRouter client when `OPENROUTER_API_KEY` is set. */
+  llm?: OpenRouterClient | undefined;
+  /** Conversation history for the LLM. */
+  llmHistory: ChatMessage[];
 }
 
 const MAX_MESSAGES = 200;
 const SLASH_COMMANDS = ['/agents', '/index', '/mode', '/help', '/exit'];
+const TUI_MAX_HISTORY = 20;
+const TUI_MAX_CONTEXT_CHARS = 6000;
+
+const TUI_SYSTEM_PROMPT =
+  'You are HELIX, an AI-powered multi-agent software development assistant. ' +
+  'You help users review code, audit security, and monitor their local development environment. ' +
+  'HELIX automatically runs specialized agents when a question calls for code analysis, ' +
+  'security scanning, or environment monitoring. ' +
+  'When agent reports are provided, answer the user directly using those findings — ' +
+  'never tell them to run a command. Ground answers in the provided codebase context. ' +
+  'Be concise, accurate, and actionable.';
+
+/** Narrow an unknown `AgentResult.data` to an `AgentReport`. */
+function isAgentReport(data: unknown): data is AgentReport {
+  return typeof data === 'object' && data !== null && 'issues' in data && 'counts' in data;
+}
+
+/** Build the OpenRouter client when a key is configured; undefined otherwise. */
+function createLlm(ctx: CliContext): OpenRouterClient | undefined {
+  const apiKey = ctx.config.openRouterApiKey;
+  if (apiKey === undefined || apiKey.length === 0) return undefined;
+  try {
+    return new OpenRouterClient({
+      apiKey,
+      baseURL: ctx.config.openRouterBaseUrl,
+      model: ctx.config.openRouterModel,
+      timeoutMs: 120_000,
+    });
+  } catch {
+    return undefined;
+  }
+}
 
 /** Fresh state; width/height are synced to the terminal on start/resize. */
 export function createState(agentsCache: string[] = []): TuiState {
@@ -115,6 +158,7 @@ export function createState(agentsCache: string[] = []): TuiState {
     mode: 'auto',
     overlay: null,
     agentsCache,
+    llmHistory: [],
   };
 }
 
@@ -144,6 +188,11 @@ function messageLines(m: TuiMsg, width: number): StyledLine[] {
   }
   if (m.kind === 'error') {
     for (const line of wrapLine(m.text, width - 2)) out.push({ text: `✘ ${line}`, style: RED });
+    return out;
+  }
+  if (m.kind === 'assistant') {
+    for (const line of wrapLine(m.text, width - 2)) out.push({ text: `  ${line}`, style: '' });
+    out.push({ text: `  ${DIM}${GRAY}— ${m.model}${RESET}`, style: `${DIM}${GRAY}` });
     return out;
   }
   // result
@@ -526,29 +575,23 @@ async function submitLine(ctx: CliContext, s: TuiState, rawLine: string): Promis
   s.pendingLabel = 'Agents working';
   s.pendingSince = Date.now();
 
-  const traceId = randomUUID();
-  const log: winston.Logger = typeof ctx.logger.child === 'function' ? ctx.logger.child({ traceId }) : ctx.logger;
-  const options: CliOptions = {
-    analyze: intents.includes('analyze'),
-    secure: intents.includes('secure'),
-    monitor: intents.includes('monitor'),
-    verbose: false,
-    json: false,
-    dryRun: false,
-    timeoutMs: DEFAULT_TIMEOUT_MS,
-  };
-  const payload: AgentPayload = { prompt, intents, traceId, options };
-  log.info('Received TUI task', { prompt });
   try {
-    const response = await ctx.orchestrator.dispatch(payload);
+    // Auto-route when the user gave no explicit flags and mode is 'auto'.
+    const effectiveIntents = intents.length > 0 ? intents : await routeChatPrompt(ctx, prompt);
+
+    const response = await ctx.orchestrator.dispatch(
+      buildPayload(ctx, prompt, effectiveIntents),
+    );
     // Best-effort display context (warm cache after dispatch — no reindex).
     let contextFiles: string[] = [];
     let contextCount = 0;
-    if (ctx.indexer !== undefined) {
+    let contextText = '';
+    if (ctx.indexer !== undefined && !ctx.indexer.fallbackMode) {
       try {
         const chunks = await ctx.indexer.retrieveContext(prompt, 5);
         contextCount = chunks.length;
         contextFiles = [...new Set(chunks.map((c) => c.filePath))].slice(0, 5);
+        contextText = ctx.indexer.formatContext(chunks, TUI_MAX_CONTEXT_CHARS);
       } catch {
         // Display-only: swallow.
       }
@@ -569,10 +612,82 @@ async function submitLine(ctx: CliContext, s: TuiState, rawLine: string): Promis
         contextCount,
       });
     }
+
+    // Summarize via the LLM when configured, using the agent reports as grounding.
+    if (s.llm !== undefined) {
+      s.pendingLabel = 'Thinking';
+      await renderAssistantReply(ctx, s, prompt, response.results, contextText);
+    }
   } catch (err: unknown) {
     pushMessage(s, { kind: 'error', text: err instanceof Error ? err.message : String(err) });
   } finally {
     s.pending = false;
+  }
+}
+
+function buildPayload(ctx: CliContext, prompt: string, intents: AgentIntent[]): AgentPayload {
+  const traceId = randomUUID();
+  const log: winston.Logger = typeof ctx.logger.child === 'function' ? ctx.logger.child({ traceId }) : ctx.logger;
+  const options: CliOptions = {
+    analyze: intents.includes('analyze'),
+    secure: intents.includes('secure'),
+    monitor: intents.includes('monitor'),
+    verbose: false,
+    json: false,
+    dryRun: false,
+    timeoutMs: DEFAULT_TIMEOUT_MS,
+  };
+  log.info('Received TUI task', { prompt });
+  return { prompt, intents, traceId, options };
+}
+
+/**
+ * Decide which agents should run for a bare conversational prompt.
+ * Reuses the orchestrator's routing decision (flags → Laya → heuristic).
+ */
+async function routeChatPrompt(ctx: CliContext, prompt: string): Promise<AgentIntent[]> {
+  try {
+    const decision = await ctx.orchestrator.route(buildPayload(ctx, prompt, []));
+    return decision.intents;
+  } catch {
+    return ['analyze'];
+  }
+}
+
+/** Build the LLM prompt from agent reports + RAG context, then render the reply. */
+async function renderAssistantReply(
+  ctx: CliContext,
+  s: TuiState,
+  prompt: string,
+  results: readonly AgentResult[],
+  contextText: string,
+): Promise<void> {
+  const llm = s.llm;
+  if (llm === undefined) return;
+
+  const parts: string[] = [`User request: ${prompt}`];
+  if (contextText.length > 0) parts.push('\n--- Codebase context ---\n', contextText);
+  const reports = results
+    .map((r) => (isAgentReport(r.data) ? formatAgentReport(r.data) : null))
+    .filter((x): x is string => x !== null);
+  if (reports.length > 0) parts.push('\n--- Agent reports ---\n', reports.join('\n\n'));
+
+  const userContent = parts.join('\n');
+  const messages: ChatMessage[] = [
+    { role: 'system', content: TUI_SYSTEM_PROMPT },
+    ...s.llmHistory,
+    { role: 'user', content: userContent },
+  ];
+  const result = await llm.complete(messages);
+  if (!result.ok) {
+    pushMessage(s, { kind: 'error', text: `LLM error: ${result.message}` });
+    return;
+  }
+  pushMessage(s, { kind: 'assistant', text: result.message, model: result.model });
+  s.llmHistory.push({ role: 'user', content: userContent });
+  s.llmHistory.push({ role: 'assistant', content: result.message });
+  if (s.llmHistory.length > TUI_MAX_HISTORY) {
+    s.llmHistory = s.llmHistory.slice(-TUI_MAX_HISTORY);
   }
 }
 
@@ -655,6 +770,10 @@ export async function runTui(ctx: CliContext): Promise<void> {
   }
   quitRequested = false;
   const s = createState(ctx.orchestrator.listAgents());
+  s.llm = createLlm(ctx);
+  if (s.llm !== undefined) {
+    pushMessage(s, { kind: 'info', text: `LLM enabled: ${ctx.config.openRouterModel}` });
+  }
   const stdin = process.stdin;
   const stdout = process.stdout;
   const syncSize = (): void => {

@@ -80,6 +80,7 @@ const INDEXABLE_EXTS: ReadonlySet<string> = new Set([
 const IGNORED_DIRS: ReadonlySet<string> = new Set([
   'node_modules',
   'dist',
+  'dist-tests',
   'build',
   'out',
   '.git',
